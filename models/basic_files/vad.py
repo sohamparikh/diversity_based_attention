@@ -1,3 +1,11 @@
+""" Encode-Attend-Decode
+
+ This model is the basic seq2seq model with only the
+ Encoder/Document Attention/ Decoder component. 
+ This model doesn't take into account the Query neither
+ tries to solve the Diversity problem while generating the summary.
+
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,14 +29,13 @@ from . import rnn_cell
 from .basics import *
 
 
-""" Vanilla-Attend-Decode model will have only document attention 
-(no query as an input), neither the distraction. We will build on top 
-of this the other models
-"""
 
 
 # TODO(ebrevdo): Remove once _linear is fully deprecated.
 linear = rnn_cell._linear  # pylint: disable=protected-access
+
+
+# Same as the implementation as given in tensorflow 0.10 package.
 
 def _extract_argmax_and_embed(embedding, output_projection=None,
                               update_embedding=True):
@@ -58,6 +65,7 @@ def _extract_argmax_and_embed(embedding, output_projection=None,
   return loop_function
 
 
+# Same as the tensorflow implementation (0.10 version)
 
 def sequence_loss_by_example(logits, targets, weights,
                              average_across_timesteps=True,
@@ -105,6 +113,8 @@ def sequence_loss_by_example(logits, targets, weights,
   return log_perps
 
 
+
+# Same as the tensorflow implementation (0.10 package)
 def sequence_loss(logits, targets, weights,
                   average_across_timesteps=True, average_across_batch=True,
                   softmax_loss_function=None, name=None):
@@ -139,20 +149,19 @@ def sequence_loss(logits, targets, weights,
       return cost
 
 
+
 def vad_decoder(decoder_inputs,
-                      initial_state,
-                      distract_initial_state,
-                      attention_states,
-                      attention_states_query,
-                      cell,
-                      distraction_cell,
-                      output_size=None,
-                      num_heads=1,
-                      loop_function=None,
-                      dtype=None,
-                      scope=None,
-                      initial_state_attention=False):
-  """RNN decoder with attention for the sequence-to-sequence model.
+                initial_state,
+                attention_states,
+                cell,
+                output_size=None,
+                num_heads=1,
+                loop_function=None,
+                dtype=None,
+                scope=None,
+                initial_state_attention=False):
+
+  """Decoder with attention.
 
   In this context "attention" means that, during decoding, the RNN can look up
   information in the additional tensor attention_states, and it does this by
@@ -224,10 +233,13 @@ def vad_decoder(decoder_inputs,
 
     dim_1 = initial_state.get_shape()[1].value
     dim_2 = cell.output_size
+
+
+    # Projects the concatenated initial decoder state [hf; hb] to the decoder cell size
     project_initial_state_W = variable_scope.get_variable("Initial_State_W", [dim_1, dim_2])
     project_initial_state_B = variable_scope.get_variable("Initial_State_Bias", [dim_2])
 
-    print ("Preksha " + scope.name)
+
     if attn_length_state is None:
       attn_length_state = shape(attention_states)[1]
 
@@ -236,7 +248,6 @@ def vad_decoder(decoder_inputs,
     # To calculate W1 * h_t we use a 1-by-1 convolution, need to reshape before.
     hidden_states = array_ops.reshape(
         attention_states, [-1, attn_length_state, 1, attn_size_state])
-
 
     hidden_features_states = []
 
@@ -255,16 +266,23 @@ def vad_decoder(decoder_inputs,
 
     state = math_ops.matmul(initial_state, project_initial_state_W) + project_initial_state_B
 
+
     def attention(query):
-      """Put attention masks on hidden using hidden_features and query."""
+
+      """Put attention masks on hidden states 
+         using hidden_features and query."""
+
       ds = []  # Results of attention reads will be stored here.
+
       if nest.is_sequence(query):  # If the query is a tuple, flatten it.
         query_list = nest.flatten(query)
         for q in query_list:  # Check that ndims == 2 if specified.
           ndims = q.get_shape().ndims
           if ndims:
             assert ndims == 2
+
         query = array_ops.concat(1, query_list)
+
       for a in xrange(num_heads):
         with variable_scope.variable_scope("Attention_%d" % a):
           y = linear(query, attention_vec_size_state, True)
@@ -278,6 +296,7 @@ def vad_decoder(decoder_inputs,
               array_ops.reshape(a, [-1, attn_length_state, 1, 1]) * hidden_states,
               [1, 2])
           ds.append(array_ops.reshape(d, [-1, attn_size_state]))
+
       return ds
 
     outputs = []
@@ -289,7 +308,7 @@ def vad_decoder(decoder_inputs,
     attns_state = [array_ops.zeros(batch_attn_size_state, dtype=dtype)
              for _ in xrange(num_heads)]
 
-    for a in attns_state:  # Ensure the second shape of attention vectors is set.
+    for a in attns_state:
       a.set_shape([None, attn_size_state])
 
 
@@ -325,9 +344,8 @@ def vad_decoder(decoder_inputs,
         attns_state = attention(state)
 
       with variable_scope.variable_scope("AttnOutputProjection"):
-
         output = linear([cell_output] + attns_state, output_size, True)
-        #x_shape = variable_scope.get_variable(name = 'x_shape',shape=cell_output.get_shape())
+
         if loop_function is not None:
           prev = output
         outputs.append(output)
@@ -335,23 +353,21 @@ def vad_decoder(decoder_inputs,
   return outputs, state
 
 def vad_decoder_wrapper(decoder_inputs,
-                                initial_state,
-                                distract_initial_state,
-                                attention_states,
-                                attention_states_query,
-                                cell_encoder,
-                                distraction_cell,
-                                num_symbols,
-                                embedding_size,
-                                num_heads=1,
-                                output_size=None,
-                                output_projection=None,
-                                feed_previous=False,
-                                update_embedding_for_previous=True,
-                                embedding_scope = None,
-                                dtype=None,
-                                scope=None,
-                                initial_state_attention=False):
+                        initial_state,
+                        attention_states,
+                        cell_encoder,
+                        num_symbols,
+                        embedding_size,
+                        num_heads=1,
+                        output_size=None,
+                        output_projection=None,
+                        feed_previous=False,
+                        update_embedding_for_previous=True,
+                        embedding_scope = None,
+                        dtype=None,
+                        scope=None,
+                        initial_state_attention=False):
+
   """RNN decoder with embedding and attention and a pure-decoding option.
 
   Args:
@@ -406,7 +422,6 @@ def vad_decoder_wrapper(decoder_inputs,
   with variable_scope.variable_scope(
     embedding_scope or "vad_decoder_wrapper", dtype=dtype,  reuse = True) as s1:
 
-    print ("Preksha", s1.name)
     embedding = variable_scope.get_variable("embedding",
                                             [num_symbols, embedding_size])
     loop_function = _extract_argmax_and_embed(
@@ -420,11 +435,8 @@ def vad_decoder_wrapper(decoder_inputs,
     return vad_decoder(
         emb_inp,
         initial_state=initial_state,
-        attention_states_query = attention_states_query,
         attention_states=attention_states,
         cell = cell_encoder,
-        distract_initial_state = distract_initial_state,
-        distraction_cell = distraction_cell,
         output_size=output_size,
         num_heads=num_heads,
         loop_function=loop_function,
@@ -432,22 +444,21 @@ def vad_decoder_wrapper(decoder_inputs,
 
 
 def vad_seq2seq(encoder_inputs,
-                                decoder_inputs,
-                                query_inputs,
-                                cell_encoder_fw,
-                                cell_encoder_bw,
-                                distraction_cell,
-                                num_encoder_symbols,
-                                num_decoder_symbols,
-                                embedding_size,
-                                initial_embedding = None,
-                                num_heads=1,
-                                embedding_trainable=False,
-                                output_projection=None,
-                                feed_previous=False,
-                                dtype=None,
-                                scope=None,
-                                initial_state_attention=False):
+                decoder_inputs,
+                query_inputs,
+                cell_encoder_fw,
+                cell_encoder_bw,
+                num_encoder_symbols,
+                num_decoder_symbols,
+                embedding_size,
+                initial_embedding = None,
+                num_heads=1,
+                embedding_trainable=False,
+                output_projection=None,
+                feed_previous=False,
+                dtype=None,
+                scope=None,
+                initial_state_attention=False):
   """Embedding sequence-to-sequence model with attention.
 
   This model first embeds encoder_inputs by a newly created embedding (of shape
@@ -502,18 +513,12 @@ def vad_seq2seq(encoder_inputs,
             initializer=initial_embedding, trainable=embedding_trainable)
     
     else:
-      embedding = variable_scope.get_variable('embedding', [num_encoder_symbols, embedding_size],trainable=embedding_trainable)
+      embedding = variable_scope.get_variable('embedding', [num_encoder_symbols, embedding_size],
+                                              trainable=embedding_trainable)
 
-    
     embedded_inputs = embedding_ops.embedding_lookup(embedding, encoder_inputs)
 
     embedded_inputs = array_ops.unpack(embedded_inputs)
-
-
-    
-    print ("Embedded Inputs length:", len(embedded_inputs))
-
-    print("Shape in embedded inputs:", embedded_inputs[0].get_shape())
 
     with variable_scope.variable_scope("Encoder_Cell"):
       encoder_outputs, encoder_state_fw, encoder_state_bw = rnn.bidirectional_rnn(
@@ -538,11 +543,9 @@ def vad_seq2seq(encoder_inputs,
           decoder_inputs,
           initial_state=encoder_state,
           attention_state=attention_states_encoder,
-          attention_states_query = None,  
           cell_encoder = cell_encoder_fw,
           num_symbols = num_decoder_symbols,
           embedding_size = embedding_size,
-          distract_initial_state = encoder_state,
           num_heads=num_heads,
           output_size=output_size,
           output_projection=output_projection,
@@ -562,12 +565,9 @@ def vad_seq2seq(encoder_inputs,
             decoder_inputs,
             initial_state=encoder_state,
             attention_states=attention_states_encoder,
-            attention_states_query = None, 
             cell_encoder = cell_encoder_fw,
             num_symbols=num_decoder_symbols,
             embedding_size = embedding_size,
-            distract_initial_state = encoder_state,
-            distraction_cell = distraction_cell, 
             num_heads=num_heads,
             output_size=output_size,
             output_projection=output_projection,
