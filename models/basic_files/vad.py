@@ -445,7 +445,6 @@ def vad_decoder_wrapper(decoder_inputs,
 
 def vad_seq2seq(encoder_inputs,
                 decoder_inputs,
-                query_inputs,
                 cell_encoder_fw,
                 cell_encoder_bw,
                 num_encoder_symbols,

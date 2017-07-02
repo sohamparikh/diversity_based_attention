@@ -18,10 +18,18 @@ class Config:
         object
     """ 
 
-    def __init__(self, learning_rate=0.0001, embedding_size=50, hidden_size=100,
-               batch_size = 64,max_epochs = 20, max_sequence_length_content = 100,
-               max_sequence_length_title=50, max_sequence_length_query = 20, early_stop=100, outdir="../out/",
-               emb_tr=False):
+    def __init__(self,
+                 learning_rate=0.0001,
+                 embedding_size=50,
+                 hidden_size=100,
+                 batch_size = 64,
+                 max_epochs = 20,
+                 max_sequence_length_content = 100,
+                 max_sequence_length_title=50,
+                 max_sequence_length_query = 20,
+                 early_stop=100,
+                 outdir="../out/",
+                 emb_tr=False):
 
         """ Initialize the object with the parameters.
 
@@ -38,8 +46,6 @@ class Config:
             max_sequence_length_query  : Max length to be set for query inputs
         """
 
-
-	print ("Config", emb_tr)
         config_file = open(outdir + "/config", "w")
 
         self.learning_rate = learning_rate
@@ -117,10 +123,6 @@ class run_model:
                 feed_dict : the dictionary created.
         """
 
-	#print ("Fill feed dictionary is")
-	#print (encoder_inputs)
-	#print (decoder_inputs)
-	#print (labels)
         feed_dict = {
         self.encode_input_placeholder : encoder_inputs,
         self.decode_input_placeholder : decoder_inputs,
@@ -147,15 +149,11 @@ class run_model:
         """
 
         start_time = time.time()
-        print(self.dataset.datasets["train"])
         steps_per_epoch = int(math.ceil(float(self.dataset.datasets["train"].number_of_examples) / float(self.config.batch_size)))
 
         total_loss = 0
 
         for step in xrange(steps_per_epoch):
-
-            # Get the next batch
-
 
             train_content, train_title, train_labels, train_query, train_weights, max_content, max_title,max_query = self.dataset.next_batch(
                 self.dataset.datasets["train"],self.config.batch_size, True)
@@ -186,19 +184,6 @@ class run_model:
             duration = time.time() - start_time
 
 
-	    #print ("Final outputs", len(outputs))
-	    #print (sess.run(tf.shape(outputs[0])))
-            #print('Trainable Variables') 
-            #print ('\n'.join([v.name for v in tf.trainable_variables()]))
-
-            #for v in tf.trainable_variables():
-            #    x_shape = sess.run(v)
-            #    print (x_shape.shape)
-
-
-	    #x = sess.run(self.model.grad, feed_dict = feed_dict)
-            #print (x)
-
 	    print ("Loss value ", loss_value, " " , step)
             sys.stdout.flush()
             # Check the loss with forward propogation
@@ -214,19 +199,8 @@ class run_model:
                 # Evaluate against the validation set.
                 print('Step %d: loss = %.2f' % (step, loss_value))
                 print('Validation Data Eval:')
-                #loss_value = self.do_eval(sess,self.dataset.datasets["valid"])
                 self.print_titles(sess,self.dataset.datasets["valid"], 2)
-                #print('Step %d: loss = %.2f' % (step, loss_value))
                     
-                # Evaluate against the test set.
-                print('Test Data Eval:')
-                loss_value = self.do_eval(sess,self.dataset.datasets["test"])
-                self.print_titles(sess,self.dataset.datasets["test"], 2)
-                print('Step %d: loss = %.2f' % (step, loss_value))
-
-                #self.print_titles_in_files(sess, self.dataset.datasets["test"])
-                #self.print_titles_in_files(sess, self.dataset.datasets["train_test"])
-                #self.print_titles_in_files(sess, self.dataset.datasets["valid"])
                 sys.stdout.flush()
 
         return float(total_loss)/ float(steps_per_epoch)
@@ -276,14 +250,14 @@ class run_model:
         steps_per_epoch =  int(math.ceil(float(data_set.number_of_examples) / float(self.config.batch_size)))
 
         for step in xrange(steps_per_epoch):
-            train_content, train_title, train_labels, train_query, train_weights, max_content, max_title, max_query = self.dataset.next_batch(
-                data_set,self.config.batch_size, False)
+            train_content, train_title, train_labels, train_query, train_weights, max_content, max_title, max_query = 
+		self.dataset.next_batch(data_set,self.config.batch_size, False)
 
             feed_dict = self.fill_feed_dict(train_content, train_title, train_labels, train_query, train_weights, feed_previous = True)
 
             _decoder_states_ = sess.run(self.logits, feed_dict=feed_dict)
 
-           # Pack the list of size max_sequence_length to a tensor
+            # Pack the list of size max_sequence_length to a tensor
             decoder_states = np.array([np.argmax(i,1) for i in _decoder_states_])
 
             # tensor will be converted to [batch_size * sequence_length * symbols]
@@ -293,11 +267,9 @@ class run_model:
             final_ds = ds.tolist()
             true_labels = true_labels.tolist()
 
-            #print(final_ds)
             for i, states in enumerate(final_ds):
 
                 # Get the index of the highest scoring symbol for each time step
-                #indexes = sess.run(tf.argmax(states, 1))
                 s =  self.dataset.decode_to_sentence(states)
                 t =  self.dataset.decode_to_sentence(true_labels[i])
                 f1.write(s + "\n")
@@ -325,7 +297,6 @@ class run_model:
         # Pack the list of size max_sequence_length to a tensor
         decoder_states = np.array([np.argmax(i,1) for i in _decoder_states_])
 
-        # tensor will be converted to [batch_size * sequence_length * symbols]
         ds = np.transpose(decoder_states)
         true_labels = np.transpose(train_labels)
 
@@ -336,7 +307,6 @@ class run_model:
         for i,states in enumerate(final_ds):
 
             # Get the index of the highest scoring symbol for each time step
-            #indexes = sess.run(tf.argmax(states, 1))
             print ("Title is " + self.dataset.decode_to_sentence(states))
             print ("True Summary is " + self.dataset.decode_to_sentence(true_labels[i]))
 
@@ -369,7 +339,7 @@ class run_model:
                                           embedding_trainable=self.config.emb_tr)
 
             # Add to the Graph the Ops for loss calculation.
-            self.loss_op = self.model.loss_op(self.logits, self.label_placeholder, self.weights_placeholder, len_vocab)
+            self.loss_op = self.model.loss_op(self.logits, self.label_placeholder, self.weights_placeholder)
 
             # Add to the Graph the Ops that calculate and apply gradients.
             self.train_op = self.model.training(self.loss_op, self.config.learning_rate)
@@ -391,7 +361,6 @@ class run_model:
 
             # if best_model exists pick the weights from there:
             if (os.path.exists(self.config.outdir + "best_model")):
-                print ("Yes!!")
                 saver.restore(sess, self.config.outdir + "best_model")
                 best_val_loss = self.do_eval(sess, self.dataset.datasets["valid"])
                 test_loss    = self.do_eval(sess, self.dataset.datasets["test"])
@@ -449,7 +418,6 @@ class run_model:
 
             print ("Test Loss:{}".format(test_loss))
             self.print_titles_in_files(sess, self.dataset.datasets["test"])
-            self.print_titles_in_files(sess, self.dataset.datasets["valid"])
 
 def main():
     parser = OptionParser()

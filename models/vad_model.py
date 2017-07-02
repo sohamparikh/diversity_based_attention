@@ -2,9 +2,7 @@ import tensorflow as tf
 import numpy as numpy
 from basic_files.vad import *
 from basic_files.rnn_cell import *
-
 import sys
-
 
 
 class BasicAttention:
@@ -54,6 +52,8 @@ class BasicAttention:
                                 to current rnn state for the decoder.
                 len_vocab     : Number of symbols in encoder/decoder.
                 hidden_size   : Hidden size of the cell state
+                weights       : The weights given to the decoder labels, accordingly 
+                                which will contribute to the loss calculation
                 c             : The cell that needs to be used.
         
             Returns:
@@ -66,49 +66,41 @@ class BasicAttention:
         self.add_cell(hidden_size, c)
         self.add_projectionLayer(hidden_size, len_vocab)
 
-        distract_cell = DistractionLSTMCell_hard(2*hidden_size, state_is_tuple = True)
         cell_encoder_bw = GRUCell(hidden_size)
-        #enc_cell = DistractionLSTMCell(hidden_size)
         ei = tf.unpack(encoder_inputs1)
         di = tf.unpack(decoder_inputs1)
-        qi = tf.unpack(query_inputs)
         outputs, state     = vad_seq2seq(encoder_inputs = ei,
-                                                decoder_inputs = di,
-                                                query_inputs = qi,
-                                                cell_encoder_fw = self.enc_cell,
-                                                cell_encoder_bw = cell_encoder_bw,
-                                                distraction_cell = distract_cell,
-                                                embedding_trainable=embedding_trainable,
-                                                num_encoder_symbols= len_vocab,
-                                                num_decoder_symbols= len_vocab,
-                                                embedding_size = embedding_size,
-                                                output_projection= (self.projection_W, self.projection_B),
-                                                feed_previous= feed_previous,
-                                                initial_embedding = initial_embedding,
-                                                dtype=tf.float32)
+                                         decoder_inputs = di,
+                                         cell_encoder_fw = self.enc_cell,
+                                         cell_encoder_bw = cell_encoder_bw,
+                                         embedding_trainable=embedding_trainable,
+                                         num_encoder_symbols= len_vocab,
+                                         num_decoder_symbols= len_vocab,
+                                         embedding_size = embedding_size,
+                                         output_projection= (self.projection_W, self.projection_B),
+                                         feed_previous= feed_previous,
+                                         initial_embedding = initial_embedding,
+                                         dtype=tf.float32)
 
         self.final_outputs = [tf.matmul(o, self.projection_W) + self.projection_B for o in outputs]
-
-        # Convert the score to a probability distribution.
-        #self.final_outputs = [tf.nn.softmax(o) for o in self.final_outputs]
 
         return self.final_outputs
 
 
-    def loss_op(self, outputs, labels, weights, len_vocab):
+    def loss_op(self, outputs, labels, weights):
 
         """ Calculate the loss from the predicted outputs and the labels
 
             Args:
                 outputs : A list of tensors of size [batch_size * num_symbols]
                 labels : A list of tensors of size [sequence_length * batch_size]
+                weights: Weights given to the decoder labels to compute the loss
 
             Returns:
                 loss: loss of type float
         """
 
         _labels = tf.unpack(labels)
-        all_ones       = [tf.ones(shape=tf.shape(_labels[0])) for _ in range(len(_labels))]
         weights = tf.to_float(weights)
         _weights = tf.unpack(weights)
         #print(_weights[0].get_shape())
@@ -132,19 +124,4 @@ class BasicAttention:
 
         optimizer = tf.train.AdamOptimizer(learning_rate)
         train_op = optimizer.minimize(loss)
-        #self.grad = optimizer.compute_gradients(loss)
         return train_op
-
-
-# To test the model
-def main():
-    n = basic_attention_model(c)
-    n.inference(int(100))
-    print "Inference"
-    l = n.loss_op(n.final_outputs, int(100))
-    print "Loss"
-    n.training(l)
-    print "Train"
-
-if __name__ == '__main__':
-    main()
