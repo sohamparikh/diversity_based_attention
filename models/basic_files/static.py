@@ -213,7 +213,9 @@ def static_decoder(decoder_inputs,
   Args:
     decoder_inputs: A list of 2D Tensors [batch_size x input_size].
     initial_state: 2D Tensor [batch_size x cell.state_size].
+    distract_initial_state: The initial state to be used 
     attention_states: 3D Tensor [batch_size x attn_length x attn_size].
+    query_embeddings: The query representation after being passed through RNN.
     cell: rnn_cell.RNNCell defining the cell function and size.
     output_size: Size of the output vectors; if None, we use cell.output_size.
     num_heads: Number of attention heads that read from attention_states.

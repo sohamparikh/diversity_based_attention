@@ -1,5 +1,4 @@
 # Dataset iterator file.
-
 import random
 import nltk
 import numpy as np
@@ -12,7 +11,7 @@ from vocab import *
 
 class Datatype:
 
-    def __init__(self, name,title,label, content, query, num_samples, max_length_content, max_length_title, max_length_query):
+    def __init__(self, name, title, label, content, query, num_samples, max_length_content, max_length_title, max_length_query):
 
         """ Defines the dataset for each category valid/train/test
 
@@ -36,13 +35,14 @@ class Datatype:
         self.labels  = label
         self.query   = query
 
-        self.number_of_samples            = num_samples
+        self.number_of_samples  = num_samples
         self.max_length_content = max_length_content
         self.max_length_title   = max_length_title - 1
         self.max_length_query   = max_length_query
 
         self.global_count_train = 0
         self.global_count_test  = 0
+
 
 class PadDataset:
 
@@ -53,7 +53,7 @@ class PadDataset:
             Arguments: 
                 data       : Batch that needs to be padded
                 max_length : Max_length to which the samples needs to be
-	                     padded.
+	                         padded.
 
             Returns:
                 padded_data : Each sample in the batch is padded to 
@@ -68,12 +68,13 @@ class PadDataset:
                     'constant', constant_values=0)
             else:
                 temp = lines[:max_length]
+
             padded_data.append(temp)
 
         return padded_data
 
 
-    def make_batch(self, data, batch_size,count, max_length):
+    def make_batch(self, data, batch_size, count, max_length):
 
         """ Make a matrix of size [batch_size * max_length]
             for given dataset
@@ -124,17 +125,20 @@ class PadDataset:
             count = dt.global_count_test
 
 
-        max_length_content = max(val.max_length_content for i,val in self.datasets.iteritems())
-        max_length_title   = max(val.max_length_title for i,val in self.datasets.iteritems())
-        max_length_query   = max(val.max_length_query for i, val in self.datasets.iteritems())
+        max_length_content = max(val.max_length_content for i, val in self.datasets.iteritems())
+        max_length_title   = max(val.max_length_title   for i, val in self.datasets.iteritems())
+        max_length_query   = max(val.max_length_query   for i, val in self.datasets.iteritems())
 
-        contents, count1 = self.make_batch(dt.content, batch_size,count, max_length_content)
-        titles, _ = self.make_batch(dt.title, batch_size, count, max_length_title)
-        labels, _ = self.make_batch(dt.labels, batch_size, count, max_length_title)
-        query, _  = self.make_batch(dt.labels, batch_size, count, max_length_query)
+        contents, count1 = self.make_batch(dt.content, batch_size, count, max_length_content)
+        titles,   _      = self.make_batch(dt.title,   batch_size, count,   max_length_title)
+        labels,   _      = self.make_batch(dt.labels,  batch_size, count,   max_length_title)
+        query,    _      = self.make_batch(dt.labels,  batch_size, count,   max_length_query)
 
+
+        # Weights for the loss function for the decoder
         weights = copy.deepcopy(titles)
 
+        # Fill the weighs matrix, based on the label parameters.
         for i in range(titles.shape[0]):
             for j in range(titles.shape[1]):
                 if (weights[i][j] > 0):
@@ -145,7 +149,7 @@ class PadDataset:
         if (c == True): 
             dt.global_count_train = count1 % dt.number_of_samples
         else:
-            dt.global_count_test = count1 % dt.number_of_samples
+            dt.global_count_test  = count1 % dt.number_of_samples
         
         return contents, titles, labels, query, weights, max_length_content, max_length_title, max_length_query
    
@@ -230,49 +234,59 @@ class PadDataset:
             self.datasets[i] = self.load_data_file(i, temp_t, temp_v, temp_q)
 
 
-    def __init__(self,  working_dir = "../Data/", embedding_size=100, global_count = 0):
+    def __init__(self,  working_dir = "../Data/", embedding_size=100, global_count = 0, diff_vocab = False):
 
 	""" Create the vocabulary and load all the datasets
 
             Arguments:
-		* working_dir : Directory path where all the data files are stored
-                * embedding_size: Dimension of vector representation for each word
-                
+        * working_dir   : Directory path where all the data files are stored
+        * embedding_size: Dimension of vector representation for each word
+        * diff_vocab    : Different vocab for encoder and decoder. 
+
 	    Returns:
 		* void
 
         """
-        filenames = [working_dir + "train_summary" ,
-                     working_dir + "train_content", working_dir + "train_query"]
 
-	self.global_count = 0
+        filenames_encode = [ working_dir + "train_content", 
+        					 working_dir + "train_query" ]
+
+        filenames_decode = [ working_dir + "train_summary" ]
+
+		self.global_count = 0
         self.vocab        = Vocab()
 
-        self.vocab.construct_vocab(filenames,embedding_size)
+
+        if (diff_vocab == False):
+        	filenames_encode = filenames_encode + filenames_decode
+        	filenames_decode = filenames_decode + filenames_decode
+
+        self.vocab.construct_vocab_encode(filenames_encode, embedding_size)
+        self.vocab.construct_vocab_decode(filenames_decode, embedding_size)
+
         self.load_data(working_dir)
 
 
-    def length_vocab(self):
 
-	""" Returns the vocabulary size
-        """
+    def length_vocab_encode(self):
+		""" Returns the encoder vocabulary size
+		"""
+        return self.vocab.len_vocab_encode
 
-        return self.vocab.len_vocab
+
+    def length_vocab_decode(self):
+    	""" Returns the decoder vocabulary size
+    	"""
+    	return self.vocab.len_vocab_decode
 
 
     def decode_to_sentence(self, decoder_states):
 
 	""" Decodes the decoder_states to sentence
 	"""
-
-        s = ""
+		s = ""
         for temp in (decoder_states):
-            if temp not in self.vocab.index_to_word:
-                    word = "<unk>"
-            else:
-                word = self.vocab.decode_word(temp)
-
-    
+			word = self.vocab.decode_word_decode(temp)
             s = s + " " + word
 
         return s
