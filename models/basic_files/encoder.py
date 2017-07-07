@@ -34,7 +34,7 @@ def call_rnn_uni_static(cell_encoder,
                         embeddings, sequence_length,
                         dtype):
 
-  encoder_outputs, encoder_state_fw, _ = rnn.rnn(cell_encoder_fw, embeddings, dtype)
+  encoder_outputs, encoder_state = rnn.rnn(cell_encoder, embeddings, dtype)
   return encoder_outputs, encoder_state
 
 def call_rnn_uni_dynamic(cell_encoder, 
@@ -64,10 +64,10 @@ def call_rnn_bidir_static(cell_encoder_fw,
   return encoder_outputs, encoder_state
 
 
-def call_rnn_bidir_dynamic(cell_enocder_fw,
+def call_rnn_bidir_dynamic(cell_encoder_fw,
                            cell_encoder_bw,
                            embeddings, sequence_length,
-                           dtype)
+                           dtype):
 
   encoder_outputs, encoder_state = rnn.bidirectional_dynamic_rnn(
                                                         cell_encoder_fw, cell_encoder_bw, 
