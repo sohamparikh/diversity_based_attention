@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 class Vocab():
 
     def __init__(self):
-
         """ Initalize the class parameters to default values
         """
 
@@ -29,7 +28,6 @@ class Vocab():
 
 
     def get_global_embeddings(self, filenames, embedding_size, embedding_path):
-
         """ Construct the Embedding Matrix for the sentences in filenames.
 
             Args:
@@ -63,7 +61,6 @@ class Vocab():
         return model
 
     def add_constant_tokens(self):
-
         """ Adds the tokens <pad> and <unk> to the vocabulary.
         """
 
@@ -76,7 +73,6 @@ class Vocab():
 
 
     def add_word(self, word, word_to_index, word_freq):
-
         """ Adds the word to the dictionary encode if not already present. 
 
         Arguments:
@@ -100,7 +96,6 @@ class Vocab():
         return word_to_index, word_freq
 
     def create_reverse_dictionary(self):
-
         """ Creates a mapping from index to the words
             This will be helpful in decoding the predictions
             to sentences.
@@ -116,7 +111,6 @@ class Vocab():
             self.index_to_word_decode[val] = key
 
     def fix_the_frequency(self, limit_encoder=0, limit_decoder=0):
-
         """ Eliminates the words from the dictionary with 
 	    a frequency less than the limit provided in the 
 	    argument.
@@ -166,7 +160,6 @@ class Vocab():
 
 
     def construct_dictionary_single_file(self, filename, word_to_index, word_freq):
-        
         """ Adds the words belonging to this file to the
             dictionary
 
@@ -184,7 +177,6 @@ class Vocab():
         return word_to_index, word_freq
 
     def construct_dictionary_multiple_files(self, filenames, word_to_index, word_freq):
-
         """ Dictionary is made from the words belonging to all
             the files in the set filenames
 
@@ -202,7 +194,6 @@ class Vocab():
         return word_to_index, word_freq
 
     def encode_word_encoder(self, word):
-
         """ Convert the word to the particular index
             based on the encoder dictionary
 

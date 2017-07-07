@@ -12,7 +12,6 @@ from vocab import *
 class Datatype:
 
     def __init__(self, name, title, label, content, query, num_samples, max_length_content, max_length_title, max_length_query):
-
         """ Defines the dataset for each category valid/train/test
 
         Args:
@@ -47,7 +46,6 @@ class Datatype:
 class PadDataset:
 
     def pad_data(self, data, max_length):
-
         """ Pad the batch to max_length given.
 
             Arguments: 
@@ -75,7 +73,6 @@ class PadDataset:
 
 
     def make_batch(self, data, batch_size, count, max_length):
-
         """ Make a matrix of size [batch_size * max_length]
             for given dataset
 
@@ -105,7 +102,6 @@ class PadDataset:
         return batch, count
 
     def next_batch(self, dt, batch_size, c=True):
-
         """ Creates a batch given the batch_size from
             mentioned dataset iterator.
 
@@ -155,8 +151,6 @@ class PadDataset:
    
  
     def load_data_file(self,name, title_file, content_file, query_file):
-
-
         """ Each of the (train/test/valid) is loaded separately.
 
 	    Arguments:
@@ -182,7 +176,7 @@ class PadDataset:
 
         max_title = 0
         for lines in title:
-            temp = [self.vocab.encode_word(word) for word in lines.split()]
+            temp = [self.vocab.encode_word_decoder(word) for word in lines.split()]
 
             if (len(temp) > max_title):
                 max_title = len(temp)
@@ -192,7 +186,7 @@ class PadDataset:
 
         max_content = 0
         for lines in content:
-            temp = [self.vocab.encode_word(word) for word in lines.split()]
+            temp = [self.vocab.encode_word_encoder(word) for word in lines.split()]
 
             if (len(temp) > max_content):
                 max_content = len(temp)
@@ -202,7 +196,7 @@ class PadDataset:
 
         max_query = 0
         for lines in query:
-            temp = [self.vocab.encode_word(word) for word in lines.split()]
+            temp = [self.vocab.encode_word_encoder(word) for word in lines.split()]
 
             if (len(temp) > max_query):
                 max_query = len(temp)
@@ -214,7 +208,6 @@ class PadDataset:
 
 
     def load_data(self, wd="../Data/"):
-
 	""" Load all the datasets
 
             Arguments:
@@ -223,8 +216,7 @@ class PadDataset:
             Returns:
 	        * void
         """
-
-        s = wd
+		s = wd
         self.datasets = {}
 
         for i in ("train", "valid", "test"):
@@ -234,9 +226,9 @@ class PadDataset:
             self.datasets[i] = self.load_data_file(i, temp_t, temp_v, temp_q)
 
 
-    def __init__(self,  working_dir = "../Data/", embedding_size=100, global_count = 0, diff_vocab = False):
-
-	""" Create the vocabulary and load all the datasets
+    def __init__(self,  working_dir = "../Data/", embedding_size=100, global_count = 0, diff_vocab = False
+    			embedding_path="../Data/embeddings.bin", limit_encode = 0, limit_decode=0):
+		""" Create the vocabulary and load all the datasets
 
             Arguments:
         * working_dir   : Directory path where all the data files are stored
@@ -250,22 +242,18 @@ class PadDataset:
 
         filenames_encode = [ working_dir + "train_content", 
         					 working_dir + "train_query" ]
-
         filenames_decode = [ working_dir + "train_summary" ]
 
 		self.global_count = 0
         self.vocab        = Vocab()
 
-
         if (diff_vocab == False):
         	filenames_encode = filenames_encode + filenames_decode
         	filenames_decode = filenames_decode + filenames_decode
 
-        self.vocab.construct_vocab_encode(filenames_encode, embedding_size)
-        self.vocab.construct_vocab_decode(filenames_decode, embedding_size)
-
+        self.vocab.construct_vocab(filenames_encode, filenames_decode, embedding_size, embedding_path
+        						   limit_encode, limit_decode)
         self.load_data(working_dir)
-
 
 
     def length_vocab_encode(self):
@@ -273,20 +261,17 @@ class PadDataset:
 		"""
         return self.vocab.len_vocab_encode
 
-
     def length_vocab_decode(self):
     	""" Returns the decoder vocabulary size
     	"""
     	return self.vocab.len_vocab_decode
 
-
     def decode_to_sentence(self, decoder_states):
-
-	""" Decodes the decoder_states to sentence
-	"""
+		""" Decodes the decoder_states to sentence
+		"""
 		s = ""
         for temp in (decoder_states):
-			word = self.vocab.decode_word_decode(temp)
+			word = self.vocab.decode_word_decoder(temp)
             s = s + " " + word
 
         return s
