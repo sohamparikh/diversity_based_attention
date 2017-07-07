@@ -232,6 +232,95 @@ class GRUCell(RNNCell):
     return new_h, new_h
 
 
+
+class GRUCell_soft(RNNCell):
+  """Gated Recurrent Unit cell (cf. http://arxiv.org/abs/1406.1078)."""
+
+  def __init__(self, num_units, input_size=None, activation=tanh):
+    if input_size is not None:
+      logging.warn("%s: The input_size parameter is deprecated.", self)
+    self._num_units = num_units
+    self._activation = activation
+
+  @property
+  def state_size(self):
+    return self._num_units
+
+  @property
+  def output_size(self):
+    return self._num_units
+
+  def __call__(self, inputs, state, scope=None):
+    """Gated recurrent unit (GRU) with nunits cells."""
+    with vs.variable_scope(scope or type(self).__name__):  # "GRUCell"
+      with vs.variable_scope("Gates"):  # Reset gate and update gate.
+        # We start with bias of 1.0 to not reset and not update.
+        r, u, g = array_ops.split(1, 3, _linear([inputs, state],
+                                             3 * self._num_units, True, 1.0))
+        r, u, g = sigmoid(r), sigmoid(u), sigmoid(g)
+      with vs.variable_scope("Candidate"):
+        c = self._activation(_linear([inputs, r * state],
+                                     self._num_units, True))
+      new_h = u * state + (1 - u) * c
+
+      eps = 1e-13
+      temp = math_ops.div(math_ops.reduce_sum(math_ops.mul(new_h, state),1), \
+                          math_ops.reduce_sum(math_ops.mul(state,state),1) + eps)
+
+      m = array_ops.transpose(g)
+
+      t1 = math_ops.mul(m , temp)
+      t1 = array_ops.transpose(t1) 
+ 
+      distract_h = new_h  -  state * t1
+    return distract_h, distract_h
+
+
+class GRUCell_hard(RNNCell):
+  """Gated Recurrent Unit cell (cf. http://arxiv.org/abs/1406.1078)."""
+
+  def __init__(self, num_units, input_size=None, activation=tanh):
+    if input_size is not None:
+      logging.warn("%s: The input_size parameter is deprecated.", self)
+    self._num_units = num_units
+    self._activation = activation
+
+  @property
+  def state_size(self):
+    return self._num_units
+
+  @property
+  def output_size(self):
+    return self._num_units
+
+  def __call__(self, inputs, state, scope=None):
+    """Gated recurrent unit (GRU) with nunits cells."""
+    with vs.variable_scope(scope or type(self).__name__):  # "GRUCell"
+
+      with vs.variable_scope("Gates"):  # Reset gate and update gate.
+        # We start with bias of 1.0 to not reset and not update.
+        r, u, g = array_ops.split(1, 3, _linear([inputs, state],
+                                  3 * self._num_units, True, 1.0))
+        r, u, g = sigmoid(r), sigmoid(u), sigmoid(g)
+
+      with vs.variable_scope("Candidate"):
+        c = self._activation(_linear([inputs, r * state],
+                                     self._num_units, True))
+      new_h = u * state + (1 - u) * c
+
+      eps = 1e-13
+      temp = math_ops.div(math_ops.reduce_sum(math_ops.mul(new_h, state),1), \
+                          math_ops.reduce_sum(math_ops.mul(state,state),1) + eps)
+
+      m = array_ops.transpose(g)
+
+      t1 = math_ops.mul(m , temp)
+      t1 = array_ops.transpose(t1) 
+ 
+      distract_h = new_h  -  state * t1
+    return distract_h, distract_h
+
+
 _LSTMStateTuple = collections.namedtuple("LSTMStateTuple", ("c", "h"))
 
 
@@ -357,8 +446,6 @@ def _get_sharded_variable(name, shape, dtype, num_shards):
     shards.append(vs.get_variable(name + "_%d" % i, [current_size] + shape[1:],
                                   dtype=dtype))
   return shards
-
-
 
 
 class DistractionLSTMCell_soft(RNNCell):
@@ -534,6 +621,86 @@ class DistractionLSTMCell_hard(RNNCell):
       else:
         new_state = array_ops.concat(1, [new_c, new_h])
       return new_h, new_state
+
+
+
+class DistractionLSTMCell_subtract(RNNCell):
+  """Distraction LSTM recurrent network cell: with soft constraints.
+
+  The implementation is based on: https://arxiv.org/abs/1704.08300
+
+  The implementation is similar to that of basic LSTM cell with some
+  subtle differences.
+  
+  An extra gating parameter "g" is added to decide what component 
+  of the cell history needs to be subtracted from the current cell 
+  state to ensure diversity. This new cell state contributes to 
+  output of the cell
+
+  It does not allow cell clipping, a projection layer, and does not
+  use peep-hole connections: it is the basic baseline.
+
+  For advanced models, please use the full LSTMCell that follows.
+  """
+
+  def __init__(self, num_units, forget_bias=1.0, input_size=None,
+               state_is_tuple=False, activation=tanh):
+    """Initialize the basic LSTM cell.
+
+    Args:
+      num_units: int, The number of units in the LSTM cell.
+      forget_bias: float, The bias added to forget gates (see above).
+      input_size: Deprecated and unused.
+      state_is_tuple: If True, accepted and returned states are 2-tuples of
+        the `c_state` and `m_state`.  By default (False), they are concatenated
+        along the column axis.  This default behavior will soon be deprecated.
+      activation: Activation function of the inner states.
+    """
+    if not state_is_tuple:
+      logging.warn("%s: Using a concatenated state is slower and will soon be "
+                   "deprecated.  Use state_is_tuple=True.", self)
+    if input_size is not None:
+      logging.warn("%s: The input_size parameter is deprecated.", self)
+    self._num_units = num_units
+    self._forget_bias = forget_bias
+    self._state_is_tuple = state_is_tuple
+    self._activation = activation
+
+  @property
+  def state_size(self):
+    return (LSTMStateTuple(self._num_units, self._num_units)
+            if self._state_is_tuple else 2 * self._num_units)
+
+  @property
+  def output_size(self):
+    return self._num_units
+
+  def __call__(self, inputs, state, scope=None):
+    """Long short-term memory cell (LSTM)."""
+    with vs.variable_scope(scope or type(self).__name__): 
+
+      # Parameters of gates are concatenated into one multiply for efficiency.
+      if self._state_is_tuple:
+        c, h = state
+      else:
+        c, h = array_ops.split(1, 2, state)
+      concat = _linear([inputs, h], 5 * self._num_units, True)
+
+      # i = input_gate, j = new_input, f = forget_gate, o = output_gate, g= distract_gate
+      i, j, f, o, g = array_ops.split(1, 5, concat)
+
+      new_c = (c * sigmoid(f + self._forget_bias) + sigmoid(i) *
+               self._activation(j))
+
+      distract_c = new_c - c
+      new_h = self._activation(distract_c) * sigmoid(o)
+
+      if self._state_is_tuple:
+        new_state = LSTMStateTuple(new_c, new_h)
+      else:
+        new_state = array_ops.concat(1, [new_c, new_h])
+ 
+     return new_h, new_state
 
 
 def _get_concat_variable(name, shape, dtype, num_shards):

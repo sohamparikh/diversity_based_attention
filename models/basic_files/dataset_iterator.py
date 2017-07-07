@@ -216,7 +216,7 @@ class PadDataset:
             Returns:
 	        * void
         """
-		s = wd
+        s = wd
         self.datasets = {}
 
         for i in ("train", "valid", "test"):
